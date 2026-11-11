@@ -1,21 +1,7 @@
-
-# ============================================================
 # IT135IU - INTRODUCTION TO DATA SCIENCE
-# TOPIC 2: AIR QUALITY MONITORING STATION PLACEMENT
-# ROLE: DATA ENGINEER
-# CITY: SEOUL, SOUTH KOREA
-# YEAR: 2022
-#
-# GOAL:
-# Load raw data -> Clean -> Transform -> Merge
-# -> Validate -> Export final working dataset
-# ============================================================
-
+# TOPIC 2: AIR QUALITY MONITORING STATION PLACEMENT=
 import pandas as pd
 
-# ============================================================
-# STEP 1: LOAD THREE RAW DATASETS
-# ============================================================
 
 air = pd.read_csv(
     "AIR_HOUR_2022.csv",
@@ -32,7 +18,7 @@ density = pd.read_csv(
     encoding="utf-8-sig"
 )
 
-# Remove extra spaces in column names
+
 for df in [air, pop, density]:
     df.columns = df.columns.str.strip()
 
@@ -40,16 +26,9 @@ print("=== RAW DATASET SHAPES ===")
 print("Air Quality:", air.shape)
 print("Population:", pop.shape)
 print("Area/Density:", density.shape)
-
 print("\nAir quality columns:")
 print(air.columns.tolist())
 
-
-# ============================================================
-# STEP 2: PREPARE AIR QUALITY DATA
-# ============================================================
-
-# Rename Korean columns to English
 air_clean = air.rename(columns={
     "측정일시": "datetime",
     "측정소 코드": "station_code",
@@ -60,7 +39,6 @@ air_clean = air.rename(columns={
     "지자체 기준초과 구분": "local_exceed"
 }).copy()
 
-# Convert timestamp
 air_clean["datetime"] = pd.to_datetime(
     air_clean["datetime"].astype(str).str.replace(
         r"\.0$", "", regex=True
@@ -69,7 +47,6 @@ air_clean["datetime"] = pd.to_datetime(
     errors="raise"
 )
 
-# Convert numeric columns
 for col in [
     "station_code",
     "pollutant_code",
@@ -83,7 +60,6 @@ for col in [
         errors="coerce"
     )
 
-# Convert pollutant codes to names
 pollutant_map = {
     1: "SO2",
     3: "NO2",
@@ -97,7 +73,6 @@ air_clean["pollutant"] = (
     air_clean["pollutant_code"].map(pollutant_map)
 )
 
-# Check unmapped pollutants
 unknown_pollutants = air_clean.loc[
     air_clean["pollutant"].isna(),
     "pollutant_code"
@@ -111,16 +86,10 @@ print("\n=== AIR QUALITY CLEANING ===")
 print("Rows before filtering:", len(air_clean))
 print("\nInstrument status counts:")
 print(air_clean["status"].value_counts(dropna=False))
-
 print("\nMissing values:")
 print(air_clean.isna().sum())
 
 
-# ============================================================
-# STEP 3: FILTER INVALID SENSOR MEASUREMENTS
-# ============================================================
-
-# Keep normal instrument status only
 air_valid = air_clean[
     air_clean["status"] == 0
 ].copy()
@@ -130,7 +99,6 @@ print("Original rows:", len(air_clean))
 print("Valid rows:", len(air_valid))
 print("Removed rows:", len(air_clean) - len(air_valid))
 
-# Check for duplicate station-hour-pollutant records
 duplicate_count = air_valid.duplicated(
     subset=["datetime", "station_code", "pollutant"]
 ).sum()
@@ -141,12 +109,6 @@ assert duplicate_count == 0, (
     "Duplicate station-hour-pollutant records found."
 )
 
-
-# ============================================================
-# STEP 4: PIVOT LONG FORMAT TO WIDE FORMAT
-# ============================================================
-
-# One row per station per hour
 air_wide = (
     air_valid
     .pivot_table(
@@ -171,14 +133,6 @@ print(
         ["CO", "NO2", "O3", "PM10", "PM2.5", "SO2"]
     ].isna().sum()
 )
-
-
-# ============================================================
-# STEP 5: MAP STATION CODES TO SEOUL DISTRICTS
-# ============================================================
-
-# Mapping used in the earlier project notebook.
-# Verify against Seoul station metadata before final submission.
 
 station_map = {
     101: "종로구",
@@ -226,11 +180,6 @@ assert air_wide["district_kr"].notna().all(), (
     "Some station codes could not be mapped."
 )
 
-
-# ============================================================
-# STEP 6: PREPARE POPULATION DATA FOR 2022
-# ============================================================
-
 pop = pop.rename(columns={
     "통계연도": "year",
     "구명": "district_kr",
@@ -241,12 +190,10 @@ pop = pop.rename(columns={
     "행정동코드": "district_code"
 })
 
-# Convert year; metadata row becomes NaN
 pop["year"] = pd.to_numeric(
     pop["year"], errors="coerce"
 )
 
-# Filter 2022 and remove Seoul total row
 pop_2022 = pop[
     (pop["year"] == 2022) &
     (pop["district_kr"] != "계")
@@ -273,11 +220,6 @@ for col in [
 print("\n=== POPULATION 2022 ===")
 print("Shape:", pop_2022.shape)
 print(pop_2022.head())
-
-
-# ============================================================
-# STEP 7: PREPARE AREA / POPULATION DENSITY DATA
-# ============================================================
 
 density = density.rename(columns={
     "통계연도": "year",
@@ -317,13 +259,6 @@ for col in [
 print("\n=== DENSITY 2022 ===")
 print("Shape:", density_2022.shape)
 print(density_2022.head())
-
-
-# ============================================================
-# STEP 8: MERGE POPULATION + AREA
-# ============================================================
-
-# Use demographic variables from population file
 pop_extra = pop_2022[
     [
         "year",
@@ -335,7 +270,6 @@ pop_extra = pop_2022[
     ]
 ].copy()
 
-# Merge by year and Korean district name
 district_2022 = density_2022.merge(
     pop_extra,
     on=["year", "district_kr"],
@@ -345,12 +279,9 @@ district_2022 = density_2022.merge(
     indicator=True
 )
 
-# Check all district population rows matched
 assert (district_2022["_merge"] == "both").all(), (
     "Some districts did not match population data."
 )
-
-# Check district codes are consistent
 assert (
     district_2022["district_code"] ==
     district_2022["district_code_pop"]
@@ -368,12 +299,6 @@ assert len(district_2022) == 25, (
     "Expected 25 Seoul districts."
 )
 
-
-# ============================================================
-# STEP 9: MERGE AIR QUALITY + DISTRICT DEMOGRAPHICS
-# ============================================================
-
-# Normalize Korean district names
 air_wide["district_kr"] = (
     air_wide["district_kr"].str.strip()
 )
@@ -382,7 +307,6 @@ district_2022["district_kr"] = (
     district_2022["district_kr"].str.strip()
 )
 
-# Check all district names are compatible
 air_districts = set(air_wide["district_kr"])
 demo_districts = set(district_2022["district_kr"])
 
@@ -394,7 +318,6 @@ assert air_districts == demo_districts, (
     "Districts do not match."
 )
 
-# Final merge
 final_df = air_wide.merge(
     district_2022,
     on="district_kr",
@@ -409,11 +332,6 @@ assert len(final_df) == len(air_wide), (
 print("\n=== FINAL MERGE ===")
 print("Shape:", final_df.shape)
 print(final_df.head())
-
-
-# ============================================================
-# STEP 10: CONVERT DISTRICTS TO ENGLISH
-# ============================================================
 
 district_en_map = {
     "종로구": "Jongno-gu",
@@ -454,13 +372,7 @@ assert final_df["district"].notna().all(), (
 print("\n=== ENGLISH DISTRICTS ===")
 print(sorted(final_df["district"].unique()))
 
-# Remove Korean column for English-only output
 final_df = final_df.drop(columns=["district_kr"])
-
-
-# ============================================================
-# STEP 11: REARRANGE FINAL DATASET COLUMNS
-# ============================================================
 
 final_columns = [
     "datetime",
@@ -490,10 +402,6 @@ final_df = (
     .reset_index(drop=True)
 )
 
-
-# ============================================================
-# STEP 12: FINAL DATA VALIDATION
-# ============================================================
 
 print("\n=== FINAL VALIDATION ===")
 
@@ -530,7 +438,6 @@ print(
     ].isna().sum()
 )
 
-# Assert required data quality rules
 assert final_df["district"].nunique() == 25
 assert duplicate_rows == 0
 
@@ -540,11 +447,6 @@ assert final_df[
 
 print("\nFirst five rows:")
 print(final_df.head())
-
-
-# ============================================================
-# STEP 13: EXPORT FINAL WORKING DATASET
-# ============================================================
 
 final_df.to_csv(
     "seoul_air_quality_2022_english.csv",
