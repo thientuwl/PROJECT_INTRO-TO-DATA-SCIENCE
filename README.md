@@ -10,7 +10,7 @@ The project combines hourly air-quality measurements from 2022 with district pop
 
 | File | Purpose |
 | --- | --- |
-| `Visualization_finalllll.ipynb` | Latest analysis and visualization notebook; start here. |
+| `D3_Topic02_Notebook.ipynb` | Latest D3 analysis and visualization notebook; start here. |
 | `D2_Topic02_Group_(1).ipynb` | D2 data profiling, cleaning, manipulation, and bias analysis. |
 | `D2_Group2_Final.ipynb` | Earlier D2 compilation, including the team's data-source and attribution record. |
 | `MergeScript.py` | Optional pipeline to rebuild the merged CSV from three original source files. |
@@ -97,7 +97,7 @@ Python should report `3.12.x`, and the final command should print `All analysis 
 python -m jupyter lab
 ```
 
-1. Open **`Visualization_finalllll.ipynb`** in JupyterLab.
+1. Open **`D3_Topic02_Notebook.ipynb`** in JupyterLab.
 2. Use the Python kernel from the environment you just installed.
 3. Select **Kernel → Restart Kernel and Run All Cells**.
 4. Wait for execution to finish, then save the notebook to retain the new outputs.
@@ -123,15 +123,15 @@ Then select **Python (seoul-air-quality)**.
 From the repository root and activated environment:
 
 ```bash
-python -m jupyter nbconvert --to notebook --execute "Visualization_finalllll.ipynb" --output "Visualization.executed.ipynb" --output-dir outputs --ExecutePreprocessor.timeout=600 --ExecutePreprocessor.kernel_name=python3
+python -m jupyter nbconvert --to notebook --execute "D3_Topic02_Notebook.ipynb" --output "D3_Topic02_Notebook.executed.ipynb" --output-dir outputs --ExecutePreprocessor.timeout=600 --ExecutePreprocessor.kernel_name=python3
 ```
 
-This executes every cell in a fresh kernel and saves the result to `outputs/Visualization.executed.ipynb`. The timeout is 600 seconds **per cell**. If a cell fails, nbconvert reports the error instead of treating the run as successful.
+This executes every cell in a fresh kernel and saves the result to `outputs/D3_Topic02_Notebook.executed.ipynb`. The timeout is 600 seconds **per cell**. If a cell fails, nbconvert reports the error instead of treating the run as successful.
 
 To export the executed notebook as HTML:
 
 ```bash
-python -m jupyter nbconvert --to html "outputs/Visualization.executed.ipynb" --output-dir outputs
+python -m jupyter nbconvert --to html "outputs/D3_Topic02_Notebook.executed.ipynb" --output-dir outputs
 ```
 
 For the separate D2 profiling notebook:
@@ -152,15 +152,38 @@ The included CSV contains **216,545 rows and 17 columns**, covering **25 distric
 | `population`, `households`, `male_population`, `female_population` | District demographic counts. |
 | `area_km2`, `population_density` | District area in km² and population density in people/km². |
 
-Important settings in `Visualization_finalllll.ipynb`:
+Important settings in `D3_Topic02_Notebook.ipynb`:
 
 - Missing pollutant values in existing rows are filled with medians grouped by station, hour, and season. The **2,455 absent station-hours** are reported separately; no new hourly rows are inserted.
 - Gas conversions create additional columns in µg/m³ using the factors recorded in the notebook. The original ppm columns remain available.
-- `MIN_HOURS = 1`: a day with at least one observed hourly row is included in the daily analysis. This is the latest notebook's current setting; changing it can change exceedance rates and rankings.
+- `MIN_HOURS = 18`: the daily exceedance analysis includes only district-days with at least 18 non-missing hourly values for **each** of PM2.5, PM10, and NO2. These counts are taken **after imputation**, so this rule primarily screens absent timestamps. Dongdaemun-gu retains 342 valid days. Changing the threshold can change exceedance rates and rankings.
+- The `*_typical` measures are medians of daily medians computed from all available district-days before the 18-hour filter. The monthly trend, annual district averages, and density correlations also use the imputed hourly data rather than `daily_valid`.
 - The screening rule uses the 75th percentile (`q=0.75`), at least one pollution-hazard criterion, and at least one demographic-exposure criterion. The notebook also checks `q=0.70` and `q=0.80`.
+- Eligible districts are ranked by the number of top-quartile hazard and exposure measures; ties are broken by the any-pollutant exceedance rate. The sensitivity table checks eligibility at each cut-off, not the stability of the final top-five ranking.
 - Use the computed `final_shortlist` table when checking results. It is a district-level screening result for further assessment; the analysis does not determine an exact street address for a new station.
+- `SEED = 42` seeds Python and NumPy. The analysis currently has no random sampling steps.
 
 Use the same CSV, package versions, notebook, and settings when comparing runs. Earlier notebooks can use different rules. Some earlier versions contain `!pip install adjustText`; with this environment, adjustText is already installed, so those installation-only lines can be skipped.
+
+### D3 verification (22 November 2026)
+
+The current D3 notebook was checked with Python 3.12.14 and all nine pinned direct dependencies. `python -m pip check` passed, all **47 code cells** ran in order in a fresh IPython process, and all **10 figures** rendered. The four report figures were visually checked. All analysis imports are covered by the existing requirements.
+
+The run confirmed 216,545 input rows, 25 districts, 2,455 absent hourly records, no duplicate district/timestamp pairs, no remaining missing pollutant values after imputation, and **11 districts passing the screening rule**. The computed shortlist matches the notebook's recommendation:
+
+| Priority | District | Top-quartile measures met | Any-pollutant exceedance rate (% of valid days) |
+| --- | --- | --- | --- |
+| 1 | Songpa-gu | 8 | 85.3% |
+| 2 | Gangnam-gu | 5 | 87.1% |
+| 3 | Gwanak-gu | 5 | 85.0% |
+| 4 | Dongjak-gu | 5 | 83.5% |
+| 5 | Gangseo-gu | 4 | 81.5% |
+
+The ranking uses the measure count first, then the exceedance rate.
+
+The district-level density–PM2.5 result also reproduced the reported Pearson correlation (`r = 0.145`, `p = 0.489`, `n = 25`).
+
+**Verification limits:** the execution environment blocks the local sockets needed to start a separate Jupyter kernel, so the `nbconvert --execute` command could not be verified here. Sequential IPython execution was used to check the analysis. The Conda YAML was parsed and checked against `requirements.txt`, but Conda environment creation was not run. The optional raw-data rebuild was not run because its three source CSVs are absent.
 
 ### Data sources and attribution
 
